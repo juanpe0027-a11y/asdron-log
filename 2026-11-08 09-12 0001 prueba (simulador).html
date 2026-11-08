@@ -59,7 +59,7 @@
   .eventos ul { margin: 0; padding: 0; max-height: 280px; overflow: auto; }
   .eventos b { color: var(--azul); display: inline-block; width: 64px; }
   .ayuda { color: var(--gris); font-size: 13px; margin-top: 6px; }
-  @media (max-width: 1000px) { main { grid-template-columns: 1fr; } .graficas { grid-template-columns: 1fr; } #mapa { height: 50vh; } }
+  @media (max-width: 1000px) { main { grid-template-columns: minmax(0, 1fr); padding: 8px; } html, body { overflow-x: hidden; } header .derecha { margin-left: 0; } .tiempo { flex-wrap: wrap; } .tiempo input { flex-basis: 100%; order: 3; } .graficas { grid-template-columns: 1fr; } #mapa { height: 50vh; } }
 </style>
 </head>
 <body>
