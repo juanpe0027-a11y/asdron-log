@@ -81,7 +81,7 @@
       <select id="velocidad" title="Velocidad de reproducción"><option value="1">×1</option><option value="5">×5</option><option value="10" selected>×10</option><option value="30">×30</option></select>
       <input type="range" id="barra" min="0" value="0"><b id="barraT">0:00</b>
     </div>
-    <div class="ayuda">Pasa el ratón (o el dedo) por la ruta o por las gráficas, mueve la barra o pulsa Reproducir: a la derecha sale todo lo de ese momento.</div>
+    <div class="ayuda">Arrastra el avión ✈ por la ruta (con el dedo o el ratón), toca la ruta o las gráficas, mueve la barra o pulsa Reproducir: todo se mueve a la vez.</div>
     <div class="l" style="margin-top:8px">Color de la ruta: altura sobre el terreno (m) · puntos rojos: fallo de sensor</div>
     <div class="leyenda" id="leyenda"></div>
     <div class="esc" id="escala"></div>
@@ -169,8 +169,25 @@ const icono = (txt, fondo) => L.divIcon({ className: "", iconSize: [30, 30], ico
 L.marker(casa, { icon: icono("H", "#43a047"), interactive: false }).addTo(map);
 L.marker([ult.lat, ult.lon], { icon: icono(perdido ? "!" : "✓", perdido ? "#c62828" : "#1e88e5"), interactive: false }).addTo(map)
   .bindTooltip(perdido ? "Última posición conocida" : "Aterrizaje", { permanent: perdido });
-const cursor = L.marker([S[0].lat, S[0].lon], { interactive: false, zIndexOffset: 1000, icon: L.divIcon({ className: "", iconSize: [26, 26], iconAnchor: [13, 13],
-  html: '<div id="avion" style="font-size:24px;line-height:26px;text-align:center;color:#fff;text-shadow:0 0 4px #000,0 0 2px #000">✈</div>' }) }).addTo(map);
+// El avión se arrastra por la ruta (ratón o dedo): todo lo demás le sigue
+const cursor = L.marker([S[0].lat, S[0].lon], { draggable: true, zIndexOffset: 1000, icon: L.divIcon({ className: "", iconSize: [44, 44], iconAnchor: [22, 22],
+  html: '<div style="width:44px;height:44px;border-radius:50%;background:rgba(30,136,229,.35);border:2px solid #fff;display:flex;align-items:center;justify-content:center">' +
+        '<div id="avion" style="font-size:26px;line-height:26px;color:#fff;text-shadow:0 0 4px #000">✈</div></div>' }) }).addTo(map);
+function cercanoA(ll) {
+  const p0 = map.latLngToContainerPoint(ll); let best = 0, bd = Infinity;
+  for (let i = 0; i < S.length; i++) { const p = map.latLngToContainerPoint([S[i].lat, S[i].lon]), d = (p.x-p0.x)**2 + (p.y-p0.y)**2; if (d < bd) { bd = d; best = i; } }
+  return best;
+}
+let arrastrando = false;
+cursor.on("dragstart", () => { arrastrando = true; parar(); });
+cursor.on("drag", e => mostrar(cercanoA(e.target.getLatLng()), true));
+cursor.on("dragend", () => { arrastrando = false; mostrar(+barra.value); });
+// Recuadro encima del mapa con lo principal del momento (útil en el móvil)
+const caja = L.control({ position: "topright" });
+caja.onAdd = () => { const d = L.DomUtil.create("div"); d.id = "cajaMapa";
+  d.style.cssText = "background:rgba(13,15,18,.86);color:#fff;padding:8px 12px;border-radius:8px;font:500 13px Roboto,sans-serif;line-height:1.5;min-width:170px";
+  return d; };
+caja.addTo(map);
 document.getElementById("leyenda").innerHTML = COLORES.map(c => `<div style="background:${c}"></div>`).join("");
 document.getElementById("escala").innerHTML = [0, .25, .5, .75, 1].map(k => `<span>${Math.round(aMin + (aMax - aMin) * k)}</span>`).join("");
 // Ratón por el mapa: el punto de la ruta más cercano (a menos de 30 px)
@@ -247,9 +264,13 @@ bPlay.onclick = () => {
 
 // ---------------- panel «En este momento»
 function fila(nombre, valor, malo) { return `<tr><td>${nombre}</td><td class="${malo ? "malo" : ""}">${valor}</td></tr>`; }
-function mostrar(i) {
+function mostrar(i, desdeArrastre) {
   const r = S[i];
-  cursor.setLatLng([r.lat, r.lon]);
+  if (!desdeArrastre) cursor.setLatLng([r.lat, r.lon]);
+  const fl = r.fallos || [];
+  document.getElementById("cajaMapa").innerHTML = `<b style="font-size:16px">${mmss(r.t)}</b> · ${r.modo || ""}<br>` +
+    `Altura: <b>${f(altura(r), "m", 0)}</b><br>Velocidad: <b>${f(r.vSuelo, "m/s")}</b><br>` +
+    `Batería: <b>${f(r.bateria, "%", 0)}</b><br>` + (r.fallos === undefined ? "" : fl.length ? `<span style="color:#ff6b6b;font-weight:700">Fallo: ${fl.join(", ")}</span>` : `<span style="color:#66bb6a">Sensores bien</span>`);
   const av = document.getElementById("avion"); if (av) av.style.transform = `rotate(${(r.rumbo || 0) - 90}deg)`;
   barra.value = i; document.getElementById("barraT").textContent = mmss(r.t);
   document.querySelectorAll(".cur").forEach(l => { l.setAttribute("x1", gx(r.t)); l.setAttribute("x2", gx(r.t)); l.setAttribute("visibility", "visible"); });
